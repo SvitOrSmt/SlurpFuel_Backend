@@ -233,11 +233,280 @@ app.post("/api/set/add_rewiew", async (req, res) => {
   }
 });
 
+app.post("/api/get/article_topic", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing topic id" });
+
+  try {
+const [rows] = await db.execute(
+  `SELECT a.*
+   FROM articles a
+   JOIN article_to_topic at ON article_pk = article_fk
+   WHERE topic_fk = ?`,
+  [id]   
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/get/topics", async (req, res) => {
+  //const { id } = req.body;
+
+  //if (!id) return res.status(400).json({ status:0, message: "Missing top" });
+
+  try {
+const [rows] = await db.execute(
+  "SELECT * FROM topics",  
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/get/collection", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+  try {
+const [rows] = await db.execute(
+"SELECT * FROM collections WHERE collection_pk = ?", [id]
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/get/collections", async (req, res) => {
+  //const { id } = req.body;
+
+  //if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+  try {
+const [rows] = await db.execute(
+"SELECT * FROM collections", 
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/get/item", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+  try {
+const [rows] = await db.execute(
+"SELECT * FROM items WHERE item_pk = ?", [id]
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/get/items", async (req, res) => {
+  //const { id } = req.body;
+
+  //if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+  try {
+const [rows] = await db.execute(
+"SELECT * FROM items", 
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/get/items_collection", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+  try {
+// Assuming collectionId is the given collection ID
+const [rows] = await db.execute(
+  `
+    SELECT i.*
+    FROM items i
+    INNER JOIN item_to_collection ic ON i.item_pk = ic.item_fk
+    WHERE ic.collection_fk = ?
+  `,
+  [id]
+);
 
 
 
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
 
-/// sent functions 
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/get/card_user", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+  try {
+const [rows] = await db.execute(
+"SELECT * FROM cart WHERE user_fk = ?", [id]
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/get/card", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+  try {
+const [rows] = await db.execute(
+"SELECT * FROM cart WHERE card_pk = ?", [id]
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+
+app.post("/api/add/card_item", async (req, res) => {
+  const { id, item_fk, quantity, variant } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+
+
+  try {
+
+const [rows1] = await db.execute(
+"SELECT * FROM items_to_card WHERE card_fk = ? AND WHERE item_fk = ?", [id, item_fk]
+);
+
+    if (rows1.length === 0) {
+      return res.status(404).json({message: "Item alrady in card" });
+    }
+
+
+const [rows] = await db.execute(
+  `INSERT INTO items_to_card (card_fk, item_fk, variant_fk, amount)
+   VALUES (?, ?, ?, ?)`, [id, item_fk, variant, quantity]
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+
+app.post("/api/add/card_item", async (req, res) => {
+  const { id, item_fk, quantity, variant } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+
+
+  try {
+
+const [rows1] = await db.execute(
+"SELECT * FROM items_to_card WHERE card_fk = ? AND WHERE item_fk = ?", [id, item_fk]
+);
+
+    if (rows1.length === 0) {
+      return res.status(404).json({message: "Item alrady in card" });
+    }
+
+
+const [rows] = await db.execute(
+  `INSERT INTO items_to_card (card_fk, item_fk, variant_fk, amount)
+   VALUES (?, ?, ?, ?)`, [id, item_fk, variant, quantity]
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+
+
 
 
 
