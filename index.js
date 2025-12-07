@@ -393,7 +393,11 @@ const [rows] = await db.execute(
   }
 });
 
-app.post("/api/get/card_user", async (req, res) => {
+
+
+
+
+app.post("/api/get/cart_user", async (req, res) => {
   const { id } = req.body;
 
   if (!id) return res.status(400).json({ status:0, message: "Missing id" });
@@ -414,14 +418,14 @@ const [rows] = await db.execute(
   }
 });
 
-app.post("/api/get/card", async (req, res) => {
+app.post("/api/get/cart", async (req, res) => {
   const { id } = req.body;
 
   if (!id) return res.status(400).json({ status:0, message: "Missing id" });
 
   try {
 const [rows] = await db.execute(
-"SELECT * FROM cart WHERE card_pk = ?", [id]
+"SELECT * FROM cart WHERE cart_pk = ?", [id]
 );
 
     if (rows.length === 0) {
@@ -436,34 +440,33 @@ const [rows] = await db.execute(
 });
 
 
-app.post("/api/add/card_item", async (req, res) => {
+app.post("/api/add/cart_item", async (req, res) => {
   const { id, item_fk, quantity, variant } = req.body;
 
   if (!id) return res.status(400).json({ status:0, message: "Missing id" });
-
+ if (!item_fk) return res.status(400).json({ status:0, message: "Missing item fk" });
+ if (!quantity) return res.status(400).json({ status:0, message: "Missing quantity" });
+ if (!variant) return res.status(400).json({ status:0, message: "Missing variant" });
 
 
   try {
 
 const [rows1] = await db.execute(
-"SELECT * FROM items_to_card WHERE card_fk = ? AND WHERE item_fk = ?", [id, item_fk]
+"SELECT * FROM items_to_cart WHERE cart_fk = ? AND item_fk = ?", [id, item_fk]
 );
 
-    if (rows1.length === 0) {
+    if (rows1.length !== 0) {
       return res.status(404).json({message: "Item alrady in card" });
     }
 
 
 const [rows] = await db.execute(
-  `INSERT INTO items_to_card (card_fk, item_fk, variant_fk, amount)
+  `INSERT INTO items_to_cart (cart_fk, item_fk, variant_fk, amount)
    VALUES (?, ?, ?, ?)`, [id, item_fk, variant, quantity]
 );
 
-    if (rows.length === 0) {
-      return res.status(404).json({message: "Item not found" });
-    }
 
-    return res.json(rows[0]);
+    return res.json(rows);
   } catch (err) {
     console.error(err);
     return res.status(404).json({ message: err.message });
@@ -471,8 +474,8 @@ const [rows] = await db.execute(
 });
 
 
-app.post("/api/add/card_item", async (req, res) => {
-  const { id, item_fk, quantity, variant } = req.body;
+app.post("/api/rm/cart_item", async (req, res) => {
+  const { id} = req.body;
 
   if (!id) return res.status(400).json({ status:0, message: "Missing id" });
 
@@ -480,25 +483,52 @@ app.post("/api/add/card_item", async (req, res) => {
 
   try {
 
-const [rows1] = await db.execute(
-"SELECT * FROM items_to_card WHERE card_fk = ? AND WHERE item_fk = ?", [id, item_fk]
-);
-
-    if (rows1.length === 0) {
-      return res.status(404).json({message: "Item alrady in card" });
-    }
-
 
 const [rows] = await db.execute(
-  `INSERT INTO items_to_card (card_fk, item_fk, variant_fk, amount)
-   VALUES (?, ?, ?, ?)`, [id, item_fk, variant, quantity]
+  `DELETE FROM items_to_cart WHERE pk = ?`, [id]
 );
 
-    if (rows.length === 0) {
-      return res.status(404).json({message: "Item not found" });
-    }
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
 
-    return res.json(rows[0]);
+
+
+app.post("/api/add/cart", async (req, res) => {
+
+  try {
+
+const [rows] = await db.execute(
+  `INSERT INTO cart (created) VALUES(NOW())`,
+);
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+
+
+app.post("/api/add/cart_user", async (req, res) => {
+  const { id, user_fk } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+  if (!user_fk) return res.status(400).json({ status:0, message: "Missing user fk" });
+
+
+  try {
+
+const [rows] = await db.execute(
+  `UPDATE cart SET user_fk = ? WHERE cart_pk = ?`,
+  [user_fk, id]
+);
+
+    return res.json(rows);
   } catch (err) {
     console.error(err);
     return res.status(404).json({ message: err.message });
