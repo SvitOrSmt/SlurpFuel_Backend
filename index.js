@@ -537,6 +537,66 @@ const [rows] = await db.execute(
 
 
 
+app.post("/api/get/cart_items", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+
+  try {
+
+  const [rows] = await db.execute(
+    `
+    SELECT 
+        itc.*,
+        i.*,
+        v.*
+    FROM items_to_cart itc
+    LEFT JOIN items i ON itc.item_fk = i.item_pk
+    LEFT JOIN variants v ON itc.variant_fk = v.variant_pk
+    WHERE itc.cart_fk = ?
+    `,
+    [id]
+  );
+
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/add/sale", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+
+  try {
+
+  const [rows] = await db.execute(
+    `
+    SELECT 
+        itc.*,
+        i.*,
+        v.*
+    FROM items_to_cart itc
+    LEFT JOIN items i ON itc.item_fk = i.item_pk
+    LEFT JOIN variants v ON itc.variant_fk = v.variant_pk
+    WHERE itc.cart_fk = ?
+    `,
+    [id]
+  );
+
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
 
 
 
