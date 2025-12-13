@@ -567,7 +567,14 @@ app.post("/api/get/cart_items", async (req, res) => {
   }
 });
 
-app.post("/api/add/sale", async (req, res) => {
+
+
+
+
+
+
+
+app.post("/api/get/variant", async (req, res) => {
   const { id } = req.body;
 
   if (!id) return res.status(400).json({ status:0, message: "Missing id" });
@@ -577,14 +584,32 @@ app.post("/api/add/sale", async (req, res) => {
 
   const [rows] = await db.execute(
     `
-    SELECT 
-        itc.*,
-        i.*,
-        v.*
-    FROM items_to_cart itc
-    LEFT JOIN items i ON itc.item_fk = i.item_pk
-    LEFT JOIN variants v ON itc.variant_fk = v.variant_pk
-    WHERE itc.cart_fk = ?
+    SELECT * FROM variants
+    WHERE variant_pk = ?
+    `,
+    [id]
+  );
+
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+app.post("/api/get/variants", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+
+  try {
+
+  const [rows] = await db.execute(
+    `
+    SELECT * FROM variants
+    WHERE item_fk = ?
     `,
     [id]
   );
@@ -598,6 +623,85 @@ app.post("/api/add/sale", async (req, res) => {
 });
 
 
+app.post("/api/get/variant_image", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+
+
+  try {
+
+  const [rows] = await db.execute(
+    `
+    SELECT i.*
+    FROM images i
+    JOIN image_to_variant itv
+      ON i.image_pk = itv.image_fk
+    WHERE itv.variant_fk = ?
+    `,
+    [id]
+  );
+
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+
+app.post("/api/update/cart_variant", async (req, res) => {
+  const { id, variant } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+  if (!variant) return res.status(400).json({ status:0, message: "Missing variant" });
+
+  try {
+
+  const [rows] = await db.execute(
+    `
+    UPDATE items_to_cart
+    SET variant_fk = ?
+    WHERE pk = ?
+    `,
+    [variant, id]
+  );
+
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
+
+
+app.post("/api/update/cart_amount", async (req, res) => {
+  const { id, amount } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing id" });
+  if (!amount) return res.status(400).json({ status:0, message: "Missing amount" });
+
+  try {
+
+  const [rows] = await db.execute(
+    `
+    UPDATE items_to_cart
+    SET amount = ?
+    WHERE pk = ?
+    `,
+    [amount, id]
+  );
+
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
 
 
 
