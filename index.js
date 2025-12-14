@@ -2,6 +2,7 @@ import express from "express";
 import Stripe from "stripe";
 import dotenv from "dotenv";
 import cors from "cors";
+import bodyParser from "body-parser";
 import mysql from "mysql2/promise";
 
 dotenv.config();
@@ -9,6 +10,69 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 app.use(cors());
+
+
+
+app.post(
+  "/stripe/webhook",
+  bodyParser.raw({ type: "application/json" }),
+  (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error("❌ Webhook signature verification failed:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object;
+
+        console.log("✅ PAYMENT SUCCESSFUL");
+        console.log("Status:", session.payment_status);
+        console.log("Metadata:", session.metadata);
+        break;
+      }
+
+      case "checkout.session.expired": {
+        const session = event.data.object;
+
+        console.log("⌛ CHECKOUT EXPIRED");
+        console.log("Metadata:", session.metadata);
+        break;
+      }
+
+      case "payment_intent.payment_failed": {
+        const paymentIntent = event.data.object;
+
+        console.log("❌ PAYMENT FAILED");
+        console.log(
+          "Reason:",
+          paymentIntent.last_payment_error?.message || "Unknown"
+        );
+        break;
+      }
+
+      default:
+        console.log("ℹ️ Unhandled event:", event.type);
+    }
+
+    res.json({ received: true });
+  }
+);
+
+
+
+
+
+
 app.use(express.json());
 
 // Existing /api route
