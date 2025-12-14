@@ -45,7 +45,7 @@ app.get("/buy", async (req, res) => {
         {
           price_data: {
             currency: "usd",
-            product_data: { name: `Order ${orderId}` },
+            product_data: { name: `SlurpFuel Order ${orderId}` },
             unit_amount: amountInCents,
           },
           quantity: 1,
@@ -702,6 +702,164 @@ app.post("/api/update/cart_amount", async (req, res) => {
     return res.status(404).json({ message: err.message });
   }
 });
+
+
+app.post("/api/start/checkout", async (req, res) => {
+  const { userId, cartId, discount_code } = req.body;
+
+  if (!userId) return res.status(400).json({ status: 0, message: "Missing user id" });
+  if (!cartId) return res.status(400).json({ status: 0, message: "Missing cart id" });
+
+  try {
+    // -------------------------
+    // Calculate cart total
+    // -------------------------
+    const [rows1] = await db.execute(
+      `
+      SELECT 
+        COALESCE(SUM(v.price * itc.amount), 0) AS total_price
+      FROM items_to_cart itc
+      LEFT JOIN variants v 
+        ON itc.variant_fk = v.variant_pk
+      WHERE itc.cart_fk = ?
+      `,
+      [cartId]
+    );
+
+    const cartPrice = Number(rows1[0].total_price);
+    let discountedTotal = cartPrice;
+    let discountValue = 0;
+
+    // -------------------------
+    // Apply discount if provided
+    // -------------------------
+    if (discount_code) {
+      const [rows2] = await db.execute(
+        "SELECT * FROM discounts WHERE code = ? AND isActive = 1",
+        [discount_code]
+      );
+
+      if (rows2.length > 0) {
+        const discount = rows2[0];
+
+        if (discount.currency === '%') {
+          const percent = Math.min(Number(discount.amount), 100);
+          discountValue = cartPrice * (percent / 100);
+        } else if (discount.currency === '$') {
+          discountValue = Number(discount.amount);
+        }
+
+        discountValue = Math.min(discountValue, cartPrice);
+        discountedTotal = cartPrice - discountValue;
+      }
+    }
+
+    console.log("Cart total:", cartPrice, "Discount:", discountValue, "After discount:", discountedTotal);
+
+    // -------------------------
+    // Get user
+    // -------------------------
+    const [rows3] = await db.execute(
+      "SELECT * FROM user WHERE user_pk = ?",
+      [userId]
+    );
+
+    if (rows3.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = rows3[0];
+
+    // -------------------------
+    // Calculate shipping
+    // -------------------------
+    let shipping_price = 0;
+    const [rows4] = await db.execute(
+      "SELECT * FROM shipping WHERE cuntry = ?",
+      [user.cuntry]
+    );
+
+    if (rows4.length > 0) {
+      shipping_price = Number(rows4[0].price);
+      console.log("Found shipping for country:", shipping_price);
+    } else {
+      const [rows5] = await db.execute(
+        "SELECT * FROM shipping WHERE cuntry = 'OTHER'",
+        []
+      );
+      if (rows5.length > 0) shipping_price = Number(rows5[0].price);
+      console.log("No specific shipping found, using OTHER:", shipping_price);
+    }
+
+    // -------------------------
+    // Final price
+    // -------------------------
+    const finalPrice = discountedTotal + shipping_price;
+    console.log("Final price after shipping:", finalPrice);
+
+    // -------------------------
+    // Insert session
+    // -------------------------
+    const [rows6] = await db.execute(
+      `INSERT INTO sessions (
+         user_fk,
+         cart_fk,
+         gross_price,
+         shipping_price,
+         discount_code,
+         discount_price,
+         final_price,
+         created
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        cartId,
+        cartPrice,
+        shipping_price,
+        discount_code || null,
+        discountValue,
+        finalPrice,
+        new Date(),
+      ]
+    );
+
+    const sessionId = rows6.insertId;
+    console.log("Inserted session ID:", sessionId);
+
+    // -------------------------
+    // Stripe Checkout session
+    // -------------------------
+    const amountInCents = Math.round(finalPrice * 100);
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: { name: `SlurpFuel Order ${sessionId}` },
+            unit_amount: amountInCents,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: { sessionId },
+      success_url: "http://localhost:5173/success",
+      cancel_url: "http://localhost:5173/cancel",
+    });
+
+    // Return Stripe URL for frontend redirect
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+
+
 
 
 
