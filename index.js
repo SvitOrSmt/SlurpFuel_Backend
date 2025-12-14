@@ -279,6 +279,27 @@ const [rows] = await db.execute(
   }
 });
 
+app.post("/api/get/topic", async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) return res.status(400).json({ status:0, message: "Missing top" });
+
+  try {
+const [rows] = await db.execute(
+  "SELECT * FROM topics where topic_pk = ?", [id] 
+);
+
+    if (rows.length === 0) {
+      return res.status(404).json({message: "Item not found" });
+    }
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
+  }
+});
+
 app.post("/api/get/collection", async (req, res) => {
   const { id } = req.body;
 
@@ -855,6 +876,42 @@ app.post("/api/start/checkout", async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: err.message });
+  }
+});
+
+
+
+
+app.post("/api/get/shipping", async (req, res) => {
+  const { cuntry, type } = req.body;
+
+  if (!type) return res.status(400).json({ status:0, message: "Missing type" });
+  if (!cuntry) return res.status(400).json({ status:0, message: "Missing cuntry" });
+
+  try {
+
+  const [rows] = await db.execute(
+    `
+    SELECT * FROM shipping
+    WHERE cuntry = ? AND type = ?
+    `,
+    [cuntry, type]
+  );
+  if (rows.length === 0) {
+    const [rows2] = await db.execute(
+      `
+      SELECT * FROM shipping
+      WHERE cuntry = 'OTHER' AND type = ?
+      `,
+      [type]
+    );
+    return res.json(rows2);
+  }
+
+    return res.json(rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(404).json({ message: err.message });
   }
 });
 
