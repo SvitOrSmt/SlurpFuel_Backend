@@ -11,6 +11,86 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const app = express();
 app.use(cors());
 
+const db = await mysql.createPool({
+  host: "localhost",
+  user: "root",
+  password: "user",
+  database: "store",
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+});
+
+async function paymentSucceeded(sessionId) {
+  const [rows] = await db.execute(
+    `UPDATE sessions
+     SET payment = 1,
+         payment_status = 'succeeded'
+     WHERE session_pk = ?`,
+    [sessionId]
+
+
+  );
+
+  console.log("Rows updated:", rows);
+
+  const [rows1] = await db.execute(
+    `SELECT * FROM sessions WHERE session_pk = ?`,
+    [sessionId]
+  );
+
+  console.log("Session data:", rows1);
+
+
+  const cost = rows1[0].final_price;
+  const cupon_codes = rows1[0].discount_code;
+  const discount = rows1[0].discount_price;
+  const gross_cost = rows1[0].gross_price;
+
+console.log("Preparing to insert sale with cost:", Number(cost), "cupon_codes:", cupon_codes, "discount:", discount, "gross_cost:", gross_cost);
+
+ const [rows2] = await db.execute(
+    `INSERT INTO sales (datetime, payment, cost, cupon_codes, discount, gross_cost) VALUES (NOW(), ?, ?, ?, ?, ?)`,
+    ["Stripe", Number(cost), cupon_codes, Number(discount), Number(gross_cost)]
+  );
+
+
+  console.log("Inserted sale: ", rows2);
+
+
+  const cartId = rows1[0].cart_fk;
+  const userId = rows1[0].user_fk;
+  const saleId = Number(rows2.insertId);
+
+
+
+  const [rows3] = await db.execute(
+    `SELECT * FROM items_to_cart WHERE cart_fk = ?`,
+    [cartId]
+  );
+
+  console.log("Cart items: ", rows3);
+
+  for (const item of rows3) {
+    await db.execute(
+      `INSERT INTO items_to_sale (sale_fk, item_fk, variant_fk, amount)
+       VALUES (?, ?, ?, ?)`,
+      [saleId, item.item_fk, item.variant_fk, item.amount]
+    );
+  }
+}
+
+async function paymentFailed(sessionId, error) {
+  const [rows] = await db.execute(
+    `UPDATE sessions
+     SET payment = 0,
+         payment_status = ?
+     WHERE session_pk = ?`,
+    [error.message, sessionId]
+  );
+}
+
+
 
 
 app.post(
@@ -38,6 +118,8 @@ app.post(
         console.log("✅ PAYMENT SUCCESSFUL");
         console.log("Status:", session.payment_status);
         console.log("Metadata:", session.metadata);
+        paymentSucceeded(session.metadata.id);
+
         break;
       }
 
@@ -56,6 +138,10 @@ app.post(
         console.log(
           "Reason:",
           paymentIntent.last_payment_error?.message || "Unknown"
+        );
+        paymentFailed(
+          paymentIntent.metadata.id,
+          paymentIntent.last_payment_error || { message: "Unknown error" }
         );
         break;
       }
@@ -79,15 +165,7 @@ app.use(express.json());
 import checkoutRoute from "./checkout.js";
 app.use("/api", checkoutRoute);
 
-const db = await mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "user",
-  database: "store",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+
 
 // -----------------------------
 // BUY ROUTE (UNCHANGED)
@@ -929,7 +1007,7 @@ app.post("/api/start/checkout", async (req, res) => {
           quantity: 1,
         },
       ],
-      metadata: { sessionId },
+      metadata: { id: sessionId },
       success_url: "http://localhost:5173/success",
       cancel_url: "http://localhost:5173/cancel",
     });
